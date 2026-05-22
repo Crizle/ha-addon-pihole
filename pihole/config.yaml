@@ -6,6 +6,7 @@ description: >-
   Blocks ads, trackers and malware domains for every device on your network —
   no per-device software needed.
 url: "https://github.com/Crizle/ha-addon-pihole"
+image: "ghcr.io/crizle/ha-addon-pihole/pihole"
 
 arch:
   - aarch64

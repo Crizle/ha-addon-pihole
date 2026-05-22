@@ -9,6 +9,9 @@ permissions:
   contents: read
   packages: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     name: Build and push Docker image
@@ -22,8 +25,9 @@ jobs:
         id: addon
         run: |
           VERSION=$(grep '^version:' pihole/config.yaml | sed 's/version:[[:space:]]*//' | tr -d '"')
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "image=ghcr.io/${{ github.repository_owner }}/ha-addon-pihole/pihole" >> $GITHUB_OUTPUT
+          echo "image=ghcr.io/${OWNER}/ha-addon-pihole/pihole" >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

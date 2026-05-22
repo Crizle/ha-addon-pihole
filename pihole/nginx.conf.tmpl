@@ -1,0 +1,143 @@
+# Generated at container startup — do not edit manually.
+# Proxies HA ingress → Pi-hole FTL.
+#
+# Pi-hole FTL injects absolute /admin/ paths into all the HTML it renders
+# (CSS/JS links, navigation hrefs, form actions) and sets data-apiurl="/api"
+# on the <body> tag for all AJAX calls.  Behind HA ingress the browser sees
+# a URL like https://host:8123/api/hassio_ingress/TOKEN/, so absolute paths
+# like /admin/vendor/… escape the ingress → HA returns 404.
+#
+# Fix strategy:
+#   location = /   : proxy root → FTL /admin/, then sub_filter HTML to turn
+#                    every /admin/ prefix into relative ./  and data-apiurl
+#                    "/api" into "./api" so AJAX also routes through ingress.
+#   location /admin/: pass CSS/JS/image assets through unchanged.
+#   location /api/  : pass Pi-hole REST API calls through unchanged.
+#                    These reach here because data-apiurl="./api" makes the
+#                    browser resolve the path relative to the ingress URL.
+#   location /      : catch-all for page navigation; rewrite /foo → /admin/foo
+#                    so FTL finds the .lp page, then apply the same HTML
+#                    sub_filter as location = /.
+
+worker_processes 1;
+error_log /dev/stderr warn;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 256;
+}
+
+http {
+    include      /etc/nginx/mime.types;
+    log_format ingress '$remote_addr "$request" -> $status loc="$upstream_http_location"';
+    access_log /dev/stdout ingress;
+    sendfile on;
+    keepalive_timeout 65;
+
+    # Pi-hole dashboard HTML is ~37KB; increase buffers so it fits in memory
+    # without spilling to a temp file. If the temp-file path is non-writable in
+    # the HA container, nginx silently falls back to streaming mode which
+    # disables sub_filter — larger in-memory buffers prevent this entirely.
+    proxy_buffer_size        64k;
+    proxy_buffers            4 64k;
+    proxy_busy_buffers_size  128k;
+    proxy_max_temp_file_size 0;     # never spill to disk
+
+    server {
+        listen INGRESS_PORT_PLACEHOLDER;
+
+        # ── Dashboard (ingress root) ──────────────────────────────────────────
+        location = / {
+            proxy_pass         http://127.0.0.1:PIHOLE_PORT_PLACEHOLDER/admin/;
+            proxy_http_version 1.1;
+            proxy_set_header   Host              "localhost";
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+            proxy_set_header   Accept-Encoding   "";
+            proxy_buffering    on;
+            proxy_ignore_headers X-Accel-Buffering;
+            proxy_hide_header  X-Frame-Options;
+            proxy_hide_header  Content-Security-Policy;
+            add_header         X-Frame-Options "SAMEORIGIN" always;
+            proxy_redirect     /admin/ ./;
+            proxy_redirect     /admin  ./;
+            proxy_read_timeout  300;
+            proxy_send_timeout  300;
+
+            sub_filter '<head>'                      '<head><base href="INGRESS_ENTRY_PLACEHOLDER/">';
+            sub_filter 'href="/admin/'           'href="./';
+            sub_filter 'src="/admin/'            'src="./';
+            sub_filter 'action="/admin/'         'action="./';
+            sub_filter 'data-apiurl="/api"'      'data-apiurl="./api"';
+            sub_filter 'data-webhome="/admin/"'  'data-webhome="./"';
+            sub_filter_once off;
+            sub_filter_types text/html;
+        }
+
+        # ── Pi-hole assets (CSS, JS, fonts, images) ───────────────────────────
+        location ^~ /admin/ {
+            proxy_pass         http://127.0.0.1:PIHOLE_PORT_PLACEHOLDER;
+            proxy_http_version 1.1;
+            proxy_set_header   Host              "localhost";
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+            proxy_hide_header  X-Frame-Options;
+            proxy_hide_header  Content-Security-Policy;
+            add_header         X-Frame-Options "SAMEORIGIN" always;
+            proxy_redirect     /admin/ ./;
+            proxy_read_timeout  300;
+            proxy_send_timeout  300;
+        }
+
+        # ── Pi-hole REST API ──────────────────────────────────────────────────
+        # data-apiurl is rewritten to "./api" so AJAX calls resolve through the
+        # ingress as GET /api/…, then land here and proxy straight to FTL.
+        location ^~ /api/ {
+            proxy_pass         http://127.0.0.1:PIHOLE_PORT_PLACEHOLDER;
+            proxy_http_version 1.1;
+            proxy_set_header   Host              "localhost";
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+            proxy_hide_header  X-Frame-Options;
+            proxy_hide_header  Content-Security-Policy;
+            add_header         X-Frame-Options "SAMEORIGIN" always;
+            proxy_read_timeout  300;
+            proxy_send_timeout  300;
+        }
+
+        # ── Page navigation (queries, settings, groups, …) ────────────────────
+        # After sub_filter converts href="/admin/queries" → href="./queries",
+        # the browser requests GET /queries.  Rewrite to GET /admin/queries so
+        # FTL finds the .lp file, then apply the same HTML path rewriting.
+        location / {
+            rewrite ^/(.+)$ /admin/$1 break;
+            proxy_pass         http://127.0.0.1:PIHOLE_PORT_PLACEHOLDER;
+            proxy_http_version 1.1;
+            proxy_set_header   Host              "localhost";
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+            proxy_set_header   Accept-Encoding   "";
+            proxy_buffering    on;
+            proxy_ignore_headers X-Accel-Buffering;
+            proxy_hide_header  X-Frame-Options;
+            proxy_hide_header  Content-Security-Policy;
+            add_header         X-Frame-Options "SAMEORIGIN" always;
+            proxy_redirect     /admin/ ./;
+            proxy_read_timeout  300;
+            proxy_send_timeout  300;
+
+            sub_filter '<head>'                      '<head><base href="INGRESS_ENTRY_PLACEHOLDER/">';
+            sub_filter 'href="/admin/'           'href="./';
+            sub_filter 'src="/admin/'            'src="./';
+            sub_filter 'action="/admin/'         'action="./';
+            sub_filter 'data-apiurl="/api"'      'data-apiurl="./api"';
+            sub_filter 'data-webhome="/admin/"'  'data-webhome="./"';
+            sub_filter_once off;
+            sub_filter_types text/html;
+        }
+    }
+}

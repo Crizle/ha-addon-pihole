@@ -1,0 +1,58 @@
+name: "Pi-hole"
+version: "6.0.3"
+slug: "pihole"
+description: >-
+  Network-wide ad blocking via your own DNS server.
+  Blocks ads, trackers and malware domains for every device on your network —
+  no per-device software needed.
+url: "https://github.com/chrisleech/ha-addon-pihole"
+
+arch:
+  - aarch64
+  - amd64
+  - armv7
+  - armhf
+  - i386
+
+init: false
+
+privileged:
+  - NET_ADMIN
+  - SYS_TIME
+  - SYS_NICE
+
+hassio_api: true
+hassio_role: default
+homeassistant_api: false
+
+ingress: true
+ingress_port: 0
+ingress_path: /
+panel_icon: mdi:pi-hole
+panel_title: Pi-hole
+
+ports:
+  53/tcp: 53
+  53/udp: 53
+ports_description:
+  53/tcp: "DNS (TCP)"
+  53/udp: "DNS (UDP)"
+
+map:
+  - config:rw
+
+options:
+  upstream_dns: "1.1.1.1;8.8.8.8"
+  timezone: "Europe/London"
+  dnssec: false
+  listening_mode: "all"
+  blocking_enabled: true
+  query_logging: true
+
+schema:
+  upstream_dns: str
+  timezone: str
+  dnssec: bool
+  listening_mode: "list(all|local|single|bind)"
+  blocking_enabled: bool
+  query_logging: bool

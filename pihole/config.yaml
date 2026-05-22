@@ -5,7 +5,7 @@ description: >-
   Network-wide ad blocking via your own DNS server.
   Blocks ads, trackers and malware domains for every device on your network —
   no per-device software needed.
-url: "https://github.com/chrisleech/ha-addon-pihole"
+url: "https://github.com/Crizle/ha-addon-pihole"
 
 arch:
   - aarch64

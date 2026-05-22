@@ -7,7 +7,7 @@ Home Assistant add-on repository for **Pi-hole v6** — network-wide ad blocking
 In Home Assistant: **Settings → Add-ons → Add-on Store → ⋮ → Repositories**, add:
 
 ```
-https://github.com/chrisleech/ha-addon-pihole
+https://github.com/Crizle/ha-addon-pihole
 ```
 
 Then find **Pi-hole** in the store and install.

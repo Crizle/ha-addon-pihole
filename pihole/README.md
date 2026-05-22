@@ -18,7 +18,7 @@ Runs **Pi-hole v6** (FTL built-in web server) with full support for the Pi-hole 
 1. In Home Assistant go to **Settings → Add-ons → Add-on Store**.
 2. Click **⋮ → Repositories** and add:
    ```
-   https://github.com/chrisleech/ha-addon-pihole
+   https://github.com/Crizle/ha-addon-pihole
    ```
 3. Find **Pi-hole** in the store and click **Install**.
 4. Configure options (upstream DNS, timezone, etc.) then click **Start**.
